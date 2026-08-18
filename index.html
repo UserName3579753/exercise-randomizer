@@ -1,0 +1,212 @@
+<!-- ExerShuffle v1.1 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>ExerShuffle</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="icon" href="icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Login Screen -->
+  <div class="screen active" id="screen-login">
+    <div class="center-content">
+      <h1 class="app-title">ExerShuffle</h1>
+      <p class="subtitle">Randomize your exercises</p>
+      <button class="btn btn-primary" id="btn-login">Sign in with Google</button>
+    </div>
+  </div>
+
+  <!-- Area List Screen -->
+  <div class="screen" id="screen-areas">
+    <header class="header">
+      <h1>My Areas</h1>
+      <button class="btn-icon" id="btn-logout" title="Sign out">&#x23FB;</button>
+    </header>
+    <div class="content scrollable" id="areas-list">
+      <p class="empty-state">No areas yet. Create one below!</p>
+    </div>
+    <div class="bottom-bar">
+      <input type="text" id="input-new-area" placeholder="New area name..." maxlength="50">
+      <button class="btn btn-primary btn-small" id="btn-add-area">Add</button>
+    </div>
+  </div>
+
+  <!-- Area Overview Screen -->
+  <div class="screen" id="screen-area-overview">
+    <header class="header">
+      <button class="btn-back" id="btn-back-to-areas">&larr;</button>
+      <h1 id="area-overview-title">Area</h1>
+      <div class="header-actions">
+        <button class="btn-icon" id="btn-rename-area" title="Rename">&#x270E;</button>
+        <button class="btn-icon btn-danger-icon" id="btn-delete-area" title="Delete">&#x1F5D1;</button>
+      </div>
+    </header>
+    <div class="content center-content">
+      <div class="stats-card" id="area-stats"></div>
+      <button class="btn btn-primary btn-block" id="btn-manage-exercises">Manage Exercises</button>
+      <button class="btn btn-primary btn-block" id="btn-shuffle-exercises">Shuffle Exercises</button>
+    </div>
+  </div>
+
+  <!-- Manage Exercises Screen -->
+  <div class="screen" id="screen-manage">
+    <header class="header">
+      <button class="btn-back" id="btn-back-to-overview">&larr;</button>
+      <h1>Exercises</h1>
+      <button class="btn-icon" id="btn-add-exercise" title="Add">&#xFF0B;</button>
+    </header>
+    <div class="toolbar">
+      <input type="text" id="input-search" placeholder="Search...">
+      <select id="select-sort">
+        <option value="name">Name</option>
+        <option value="stars">Stars</option>
+        <option value="status">Status</option>
+      </select>
+    </div>
+    <div class="toolbar">
+      <button class="btn btn-small btn-secondary" id="btn-activate-all">Activate All</button>
+      <button class="btn btn-small btn-secondary" id="btn-deactivate-all">Deactivate All</button>
+    </div>
+    <div class="content scrollable" id="exercises-list">
+      <p class="empty-state">No exercises yet. Tap + to add one!</p>
+    </div>
+  </div>
+
+  <!-- Exercise Form Screen -->
+  <div class="screen" id="screen-exercise-form">
+    <header class="header">
+      <button class="btn-back" id="btn-back-to-manage">&larr;</button>
+      <h1 id="exercise-form-title">New Exercise</h1>
+      <button class="btn-icon btn-danger-icon" id="btn-delete-exercise" title="Delete" style="display:none;">&#x1F5D1;</button>
+    </header>
+    <div class="content scrollable">
+      <form id="exercise-form">
+        <div class="form-group">
+          <label for="ex-name">Name *</label>
+          <input type="text" id="ex-name" required maxlength="100">
+        </div>
+        <div class="form-group">
+          <label>Stars</label>
+          <div class="star-picker" id="star-picker">
+            <span class="star" data-value="1">&#x2605;</span>
+            <span class="star" data-value="2">&#x2605;</span>
+            <span class="star" data-value="3">&#x2605;</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="ex-minutes">Time (minutes)</label>
+          <input type="number" id="ex-minutes" min="0" max="999" step="1">
+        </div>
+        <div class="form-group">
+          <label for="ex-note">Note</label>
+          <textarea id="ex-note" rows="3" maxlength="500"></textarea>
+        </div>
+        <div class="form-group toggle-group">
+          <label for="ex-active">Active</label>
+          <label class="toggle">
+            <input type="checkbox" id="ex-active" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="form-group toggle-group">
+          <label for="ex-always-include">Always include in shuffle</label>
+          <label class="toggle">
+            <input type="checkbox" id="ex-always-include">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Save</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Shuffle Screen -->
+  <div class="screen" id="screen-shuffle">
+    <header class="header">
+      <button class="btn-back" id="btn-back-to-overview2">&larr;</button>
+      <h1>Shuffle</h1>
+    </header>
+    <div class="content scrollable">
+      <div class="shuffle-config" id="shuffle-config">
+        <div class="form-group">
+          <label for="shuffle-count">Number of exercises</label>
+          <input type="number" id="shuffle-count" min="1" max="50" value="1">
+        </div>
+        <div class="form-group">
+          <label for="shuffle-star-filter">Star filter</label>
+          <select id="shuffle-star-filter">
+            <option value="">None</option>
+            <option value="gte1">&ge; 1 star</option>
+            <option value="gte2">&ge; 2 stars</option>
+            <option value="gte3">&ge; 3 stars</option>
+            <option value="lte1">&le; 1 star</option>
+            <option value="lte2">&le; 2 stars</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="shuffle-time-filter">Time filter</label>
+          <select id="shuffle-time-filter">
+            <option value="">None</option>
+            <option value="lte5">&le; 5 min</option>
+            <option value="lte10">&le; 10 min</option>
+            <option value="lte15">&le; 15 min</option>
+            <option value="gte5">&ge; 5 min</option>
+            <option value="gte10">&ge; 10 min</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="shuffle-star-budget">Star budget (optional)</label>
+          <input type="number" id="shuffle-star-budget" min="0" max="999" placeholder="Total stars target">
+        </div>
+        <div class="form-group">
+          <label for="shuffle-time-budget">Time budget in min (optional)</label>
+          <input type="number" id="shuffle-time-budget" min="0" max="9999" placeholder="Total minutes target">
+        </div>
+        <button class="btn btn-primary btn-block" id="btn-shuffle">Shuffle!</button>
+      </div>
+      <div id="shuffle-results" class="shuffle-results" style="display:none;">
+        <button class="btn btn-secondary btn-small" id="btn-reshuffle">Shuffle Again</button>
+        <button class="btn btn-secondary btn-small" id="btn-reset-excluded">Reset Excluded</button>
+        <div id="shuffle-warning" class="warning" style="display:none;"></div>
+        <div id="results-container"></div>
+        <div id="results-total" class="results-total"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Dialog -->
+  <div class="dialog-overlay" id="dialog-overlay" style="display:none;">
+    <div class="dialog">
+      <p id="dialog-message">Are you sure?</p>
+      <div class="dialog-actions">
+        <button class="btn btn-secondary" id="dialog-cancel">Cancel</button>
+        <button class="btn btn-danger" id="dialog-confirm">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Dialog -->
+  <div class="dialog-overlay" id="rename-overlay" style="display:none;">
+    <div class="dialog">
+      <p>Rename area:</p>
+      <input type="text" id="rename-input" maxlength="50">
+      <div class="dialog-actions">
+        <button class="btn btn-secondary" id="rename-cancel">Cancel</button>
+        <button class="btn btn-primary" id="rename-confirm">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
