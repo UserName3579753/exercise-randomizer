@@ -1,4 +1,4 @@
-// ExerShuffle v1.1
+// ExerShuffle v1.2
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -25,6 +25,7 @@ let exercises = [];
 let editingExerciseId = null;
 let excludedIds = new Set();
 let lastResults = null;
+let randomQueue = [];
 
 // Excluded persistence (localStorage, per area)
 function getExcludedKey() {
@@ -111,6 +112,7 @@ async function openArea(areaId, areaName) {
   await loadExercises();
   loadExcluded();
   lastResults = null;
+  randomQueue = [];
   renderStats();
 }
 
@@ -161,7 +163,6 @@ $('btn-delete-area').addEventListener('click', () => {
     snap.forEach(d => batch.delete(d.ref));
     batch.delete(doc(db, 'users', currentUser.uid, 'areas', currentAreaId));
     await batch.commit();
-    // Clean up localStorage
     localStorage.removeItem(getExcludedKey());
     show('screen-areas');
     loadAreas();
@@ -229,11 +230,9 @@ function renderExerciseList() {
       </div>
     `;
     div.querySelector('.ex-info').addEventListener('click', (e) => {
-      // Don't open form if clicking the excluded badge
       if (e.target.classList.contains('badge-excluded')) return;
       openExerciseForm(ex);
     });
-    // Un-exclude by clicking the badge
     const excludedBadge = div.querySelector('.badge-excluded');
     if (excludedBadge) {
       excludedBadge.addEventListener('click', (e) => {
@@ -345,7 +344,6 @@ $('btn-delete-exercise').addEventListener('click', () => {
     const ref = doc(db, 'users', currentUser.uid, 'areas', currentAreaId, 'exercises', editingExerciseId);
     await deleteDoc(ref);
     exercises = exercises.filter(x => x.id !== editingExerciseId);
-    // Also remove from excluded if present
     excludedIds.delete(editingExerciseId);
     saveExcluded();
     show('screen-manage');
@@ -354,16 +352,36 @@ $('btn-delete-exercise').addEventListener('click', () => {
 });
 
 // --- SHUFFLE ---
-$('btn-shuffle-exercises').addEventListener('click', () => {
-  show('screen-shuffle');
-  if (lastResults) {
-    $('shuffle-config').style.display = 'none';
-    $('shuffle-results').style.display = 'block';
-    renderResults(lastResults);
-  } else {
-    $('shuffle-config').style.display = 'block';
-    $('shuffle-results').style.display = 'none';
+
+// Shuffle mode dropdown: update label and placeholder
+$('shuffle-mode').addEventListener('change', updateShuffleModeUI);
+
+function updateShuffleModeUI() {
+  const mode = $('shuffle-mode').value;
+  const label = $('shuffle-value-label');
+  const input = $('shuffle-value');
+  if (mode === 'count') {
+    label.textContent = 'Number of exercises';
+    input.placeholder = 'e.g. 5';
+    input.value = input.value || '1';
+  } else if (mode === 'time') {
+    label.textContent = 'Total minutes';
+    input.placeholder = 'e.g. 30';
+    input.value = input.value || '10';
+  } else if (mode === 'stars') {
+    label.textContent = 'Total stars';
+    input.placeholder = 'e.g. 6';
+    input.value = input.value || '3';
   }
+}
+
+// Always show filter screen when entering shuffle (fix for bug #2)
+$('btn-shuffle-exercises').addEventListener('click', () => {
+  lastResults = null;
+  $('shuffle-config').style.display = 'block';
+  $('shuffle-results').style.display = 'none';
+  updateShuffleModeUI();
+  show('screen-shuffle');
 });
 
 $('btn-back-to-overview2').addEventListener('click', () => {
@@ -374,27 +392,29 @@ $('btn-back-to-overview2').addEventListener('click', () => {
 $('btn-shuffle').addEventListener('click', doShuffle);
 $('btn-reshuffle').addEventListener('click', doShuffle);
 
+$('btn-new-shuffle').addEventListener('click', () => {
+  lastResults = null;
+  $('shuffle-config').style.display = 'block';
+  $('shuffle-results').style.display = 'none';
+});
+
 $('btn-reset-excluded').addEventListener('click', () => {
   excludedIds.clear();
   saveExcluded();
   doShuffle();
 });
 
-function doShuffle() {
-  const count = parseInt($('shuffle-count').value) || 1;
+function getFilteredPool() {
   const starFilter = $('shuffle-star-filter').value;
   const timeFilter = $('shuffle-time-filter').value;
-  const starBudget = $('shuffle-star-budget').value ? parseInt($('shuffle-star-budget').value) : null;
-  const timeBudget = $('shuffle-time-budget').value ? parseInt($('shuffle-time-budget').value) : null;
 
-  // Separate pinned (always include) from regular pool
   // Pinned: active + alwaysInclude + not excluded
   const pinned = exercises.filter(e => e.active !== false && e.alwaysInclude && !excludedIds.has(e.id));
 
   // Regular pool: active + not pinned + not excluded
   let pool = exercises.filter(e => e.active !== false && !e.alwaysInclude && !excludedIds.has(e.id));
 
-  // Apply filters ONLY to regular pool (pinned trump filters)
+  // Apply filters only to regular pool
   if (starFilter) {
     if (starFilter === 'gte1') pool = pool.filter(e => (e.stars || 0) >= 1);
     else if (starFilter === 'gte2') pool = pool.filter(e => (e.stars || 0) >= 2);
@@ -411,8 +431,15 @@ function doShuffle() {
     else if (timeFilter === 'gte10') pool = pool.filter(e => e.minutes && e.minutes >= 10);
   }
 
+  return { pinned, pool };
+}
+
+function doShuffle() {
+  const mode = $('shuffle-mode').value;
+  const value = parseInt($('shuffle-value').value) || 1;
+  const { pinned, pool } = getFilteredPool();
+
   const warning = $('shuffle-warning');
-  const remainingSlots = Math.max(0, count - pinned.length);
 
   if (pinned.length === 0 && pool.length === 0) {
     warning.textContent = 'No exercises available. Try adjusting filters or resetting excluded.';
@@ -425,12 +452,45 @@ function doShuffle() {
     return;
   }
 
+  let results;
   let warnings = [];
-  if (pinned.length > count) {
-    warnings.push(`You have ${pinned.length} pinned exercises but requested only ${count}. Showing all pinned.`);
-  }
-  if (remainingSlots > 0 && pool.length < remainingSlots) {
-    warnings.push(`Only ${pool.length} additional exercise(s) available beyond pinned.`);
+
+  if (mode === 'count') {
+    const count = value;
+    const remainingSlots = Math.max(0, count - pinned.length);
+    if (pinned.length > count) {
+      warnings.push(`You have ${pinned.length} pinned exercises but requested only ${count}. Showing all pinned.`);
+    }
+    if (remainingSlots > 0 && pool.length < remainingSlots) {
+      warnings.push(`Only ${pool.length} additional exercise(s) available beyond pinned.`);
+    }
+    const randomCount = Math.min(remainingSlots, pool.length);
+    const randomPicked = randomPick(pool, randomCount);
+    results = [...pinned, ...randomPicked];
+
+  } else if (mode === 'time') {
+    const budget = value;
+    const pinnedTime = pinned.reduce((s, e) => s + (e.minutes || 0), 0);
+    if (pinnedTime > budget) {
+      warnings.push(`Pinned exercises already use ${pinnedTime} min, which exceeds the ${budget} min budget. Showing pinned only.`);
+      results = [...pinned];
+    } else {
+      const remainingBudget = budget - pinnedTime;
+      const randomPicked = budgetFill(pool, remainingBudget, 'minutes');
+      results = [...pinned, ...randomPicked];
+    }
+
+  } else if (mode === 'stars') {
+    const budget = value;
+    const pinnedStars = pinned.reduce((s, e) => s + (e.stars || 0), 0);
+    if (pinnedStars > budget) {
+      warnings.push(`Pinned exercises already have ${pinnedStars} stars, which exceeds the ${budget} star budget. Showing pinned only.`);
+      results = [...pinned];
+    } else {
+      const remainingBudget = budget - pinnedStars;
+      const randomPicked = budgetFill(pool, remainingBudget, 'stars');
+      results = [...pinned, ...randomPicked];
+    }
   }
 
   if (warnings.length > 0) {
@@ -440,22 +500,6 @@ function doShuffle() {
     warning.style.display = 'none';
   }
 
-  // Build results: pinned + random from pool
-  let randomCount = Math.min(remainingSlots, pool.length);
-  let randomPicked;
-
-  if (starBudget || timeBudget) {
-    // Budget mode: account for pinned contributions
-    const pinnedStars = pinned.reduce((s, e) => s + (e.stars || 0), 0);
-    const pinnedTime = pinned.reduce((s, e) => s + (e.minutes || 0), 0);
-    const adjustedStarBudget = starBudget ? Math.max(0, starBudget - pinnedStars) : null;
-    const adjustedTimeBudget = timeBudget ? Math.max(0, timeBudget - pinnedTime) : null;
-    randomPicked = budgetShuffle(pool, randomCount, adjustedStarBudget, adjustedTimeBudget);
-  } else {
-    randomPicked = randomPick(pool, randomCount);
-  }
-
-  const results = [...pinned, ...randomPicked];
   lastResults = results;
   $('shuffle-config').style.display = 'none';
   $('shuffle-results').style.display = 'block';
@@ -467,30 +511,23 @@ function randomPick(pool, n) {
   return shuffled.slice(0, n);
 }
 
-function budgetShuffle(pool, count, starTarget, timeTarget) {
-  if (count === 0) return [];
-  const n = Math.min(count, pool.length);
-  let bestPick = null;
-  let bestScore = Infinity;
+// Greedily fill exercises until budget is reached
+function budgetFill(pool, budget, field) {
+  if (budget <= 0 || pool.length === 0) return [];
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  const picked = [];
+  let remaining = budget;
 
-  for (let attempt = 0; attempt < 500; attempt++) {
-    const pick = randomPick(pool, n);
-    let score = 0;
-    if (starTarget) {
-      const totalStars = pick.reduce((s, e) => s + (e.stars || 0), 0);
-      score += Math.abs(totalStars - starTarget);
+  for (const ex of shuffled) {
+    const cost = ex[field] || 0;
+    if (cost === 0) continue;
+    if (cost <= remaining) {
+      picked.push(ex);
+      remaining -= cost;
+      if (remaining <= 0) break;
     }
-    if (timeTarget) {
-      const totalTime = pick.reduce((s, e) => s + (e.minutes || 0), 0);
-      score += Math.abs(totalTime - timeTarget);
-    }
-    if (score < bestScore) {
-      bestScore = score;
-      bestPick = pick;
-    }
-    if (score === 0) break;
   }
-  return bestPick;
+  return picked;
 }
 
 function renderResults(results) {
@@ -521,13 +558,70 @@ function renderResults(results) {
   });
 
   const totalDiv = $('results-total');
-  const timesWithValues = results.filter(e => e.minutes);
-  if (timesWithValues.length > 0) {
-    const total = timesWithValues.reduce((s, e) => s + e.minutes, 0);
-    totalDiv.textContent = `Total time: ${total} min`;
-  } else {
-    totalDiv.textContent = '';
+  const totalTime = results.reduce((s, e) => s + (e.minutes || 0), 0);
+  const totalStars = results.reduce((s, e) => s + (e.stars || 0), 0);
+  const parts = [];
+  if (totalTime > 0) parts.push(`${totalTime} min`);
+  if (totalStars > 0) parts.push(`${totalStars} \u2605`);
+  totalDiv.textContent = parts.length > 0 ? `Total: ${parts.join(' \u00b7 ')} \u00b7 ${results.length} exercises` : `${results.length} exercise(s)`;
+}
+
+// --- RANDOM EXERCISE ---
+$('btn-random-exercise').addEventListener('click', () => {
+  randomQueue = [];
+  show('screen-random');
+  showNextRandom();
+});
+
+$('btn-back-to-overview3').addEventListener('click', () => {
+  show('screen-area-overview');
+  renderStats();
+});
+
+$('btn-next-random').addEventListener('click', showNextRandom);
+
+function buildRandomQueue() {
+  const pinned = exercises.filter(e => e.active !== false && e.alwaysInclude && !excludedIds.has(e.id));
+  const rest = exercises.filter(e => e.active !== false && !e.alwaysInclude && !excludedIds.has(e.id));
+  const shuffledPinned = [...pinned].sort(() => Math.random() - 0.5);
+  const shuffledRest = [...rest].sort(() => Math.random() - 0.5);
+  return [...shuffledPinned, ...shuffledRest];
+}
+
+function showNextRandom() {
+  if (randomQueue.length === 0) {
+    randomQueue = buildRandomQueue();
   }
+
+  const card = $('random-card');
+  const empty = $('random-empty');
+  const wrapper = $('random-card-wrapper');
+  const nextBtn = $('btn-next-random');
+
+  if (randomQueue.length === 0) {
+    wrapper.style.display = 'none';
+    empty.style.display = 'block';
+    nextBtn.style.display = 'none';
+    return;
+  }
+
+  wrapper.style.display = 'block';
+  empty.style.display = 'none';
+  nextBtn.style.display = 'block';
+
+  const ex = randomQueue.shift();
+  const stars = ex.stars ? '\u2605'.repeat(ex.stars) : '';
+  const mins = ex.minutes ? ex.minutes + ' min' : '';
+  const meta = [stars, mins].filter(Boolean).join(' \u00b7 ');
+  const note = ex.note ? `<div class="result-note">${ex.note}</div>` : '';
+  const pinnedLabel = ex.alwaysInclude ? '<div class="result-pinned">\uD83D\uDCCC Always included</div>' : '';
+
+  card.innerHTML = `
+    <div class="result-name">${ex.name}</div>
+    <div class="result-meta">${meta}</div>
+    ${pinnedLabel}
+    ${note}
+  `;
 }
 
 // --- CONFIRM DIALOG ---

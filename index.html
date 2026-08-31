@@ -1,4 +1,4 @@
-<!-- ExerShuffle v1.1 -->
+<!-- ExerShuffle v1.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -55,6 +55,7 @@
       <div class="stats-card" id="area-stats"></div>
       <button class="btn btn-primary btn-block" id="btn-manage-exercises">Manage Exercises</button>
       <button class="btn btn-primary btn-block" id="btn-shuffle-exercises">Shuffle Exercises</button>
+      <button class="btn btn-primary btn-block" id="btn-random-exercise">Random Exercise</button>
     </div>
   </div>
 
@@ -139,8 +140,16 @@
     <div class="content scrollable">
       <div class="shuffle-config" id="shuffle-config">
         <div class="form-group">
-          <label for="shuffle-count">Number of exercises</label>
-          <input type="number" id="shuffle-count" min="1" max="50" value="1">
+          <label for="shuffle-mode">Limit by</label>
+          <select id="shuffle-mode">
+            <option value="count">Number of exercises</option>
+            <option value="time">Time budget (minutes)</option>
+            <option value="stars">Star budget</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label id="shuffle-value-label" for="shuffle-value">Number of exercises</label>
+          <input type="number" id="shuffle-value" min="1" max="9999" value="1">
         </div>
         <div class="form-group">
           <label for="shuffle-star-filter">Star filter</label>
@@ -164,23 +173,31 @@
             <option value="gte10">&ge; 10 min</option>
           </select>
         </div>
-        <div class="form-group">
-          <label for="shuffle-star-budget">Star budget (optional)</label>
-          <input type="number" id="shuffle-star-budget" min="0" max="999" placeholder="Total stars target">
-        </div>
-        <div class="form-group">
-          <label for="shuffle-time-budget">Time budget in min (optional)</label>
-          <input type="number" id="shuffle-time-budget" min="0" max="9999" placeholder="Total minutes target">
-        </div>
         <button class="btn btn-primary btn-block" id="btn-shuffle">Shuffle!</button>
       </div>
       <div id="shuffle-results" class="shuffle-results" style="display:none;">
         <button class="btn btn-secondary btn-small" id="btn-reshuffle">Shuffle Again</button>
+        <button class="btn btn-secondary btn-small" id="btn-new-shuffle">New Shuffle</button>
         <button class="btn btn-secondary btn-small" id="btn-reset-excluded">Reset Excluded</button>
         <div id="shuffle-warning" class="warning" style="display:none;"></div>
         <div id="results-container"></div>
         <div id="results-total" class="results-total"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Random Exercise Screen -->
+  <div class="screen" id="screen-random">
+    <header class="header">
+      <button class="btn-back" id="btn-back-to-overview3">&larr;</button>
+      <h1>Random Exercise</h1>
+    </header>
+    <div class="content center-content">
+      <div id="random-card-wrapper">
+        <div class="result-card single" id="random-card"></div>
+      </div>
+      <div id="random-empty" class="empty-state" style="display:none;">No exercises available.</div>
+      <button class="btn btn-primary btn-block" id="btn-next-random">Next</button>
     </div>
   </div>
 

@@ -1,4 +1,4 @@
-/* ExerShuffle v1.1 */
+/* ExerShuffle v1.2 */
 :root {
   --blue: #2979FF;
   --blue-dark: #1565C0;
@@ -403,6 +403,11 @@ input:focus, textarea:focus, select:focus {
   margin-top: 16px;
 }
 
+.shuffle-results .btn-small {
+  margin-right: 6px;
+  margin-bottom: 8px;
+}
+
 .result-card {
   background: var(--white);
   border-radius: var(--radius);
@@ -474,6 +479,17 @@ input:focus, textarea:focus, select:focus {
   margin-bottom: 12px;
   font-size: 0.85rem;
   color: #E65100;
+}
+
+/* Random exercise screen */
+#random-card-wrapper {
+  width: 100%;
+  max-width: 320px;
+}
+
+#screen-random .center-content {
+  padding-top: 40px;
+  justify-content: flex-start;
 }
 
 /* Dialog */
