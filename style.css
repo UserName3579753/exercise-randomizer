@@ -1,4 +1,4 @@
-/* ExerShuffle v1.2 */
+/* ExerShuffle v1.3 */
 :root {
   --blue: #2979FF;
   --blue-dark: #1565C0;
@@ -539,4 +539,21 @@ input:focus, textarea:focus, select:focus {
 /* Utility */
 .hidden {
   display: none !important;
+}
+
+/* Tappable result cards */
+.result-card.tappable {
+  cursor: pointer;
+}
+
+.result-card.tappable:active {
+  background: var(--grey-light);
+}
+
+#random-card {
+  cursor: pointer;
+}
+
+#random-card:active {
+  background: var(--grey-light);
 }

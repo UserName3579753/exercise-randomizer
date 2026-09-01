@@ -1,4 +1,4 @@
-// ExerShuffle v1.2
+// ExerShuffle v1.3
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -26,6 +26,9 @@ let editingExerciseId = null;
 let excludedIds = new Set();
 let lastResults = null;
 let randomQueue = [];
+let returnToScreen = 'screen-manage';
+let currentRandomExercise = null;
+let isRestoring = false;
 
 // Excluded persistence (localStorage, per area)
 function getExcludedKey() {
@@ -41,11 +44,114 @@ function saveExcluded() {
   localStorage.setItem(getExcludedKey(), JSON.stringify([...excludedIds]));
 }
 
+// --- STATE PERSISTENCE ---
+function getStateKey() {
+  return `exershuffle_state_${currentUser?.uid}`;
+}
+
+function saveAppState(screenId) {
+  if (!currentUser) return;
+  // Don't save transient screens
+  if (screenId === 'screen-exercise-form' || screenId === 'screen-login') return;
+  try {
+    const state = {
+      areaId: currentAreaId,
+      areaName: currentAreaName,
+      screen: screenId,
+      shuffleConfig: {
+        mode: $('shuffle-mode').value,
+        value: $('shuffle-value').value,
+        starFilter: $('shuffle-star-filter').value,
+        timeFilter: $('shuffle-time-filter').value,
+      },
+      shuffleResultIds: lastResults ? lastResults.map(e => e.id) : null,
+      shuffleConfigVisible: $('shuffle-config').style.display !== 'none',
+    };
+    localStorage.setItem(getStateKey(), JSON.stringify(state));
+  } catch { /* ignore */ }
+}
+
+async function restoreAppState() {
+  if (!currentUser) return false;
+  try {
+    const stored = localStorage.getItem(getStateKey());
+    if (!stored) return false;
+    const state = JSON.parse(stored);
+    if (!state.areaId || !state.screen || state.screen === 'screen-login') return false;
+
+    // Restore area context
+    currentAreaId = state.areaId;
+    currentAreaName = state.areaName;
+    await loadExercises();
+    loadExcluded();
+
+    $('area-overview-title').textContent = currentAreaName;
+
+    if (state.screen === 'screen-areas') {
+      show('screen-areas');
+      loadAreas();
+      return true;
+    }
+
+    if (state.screen === 'screen-area-overview') {
+      renderStats();
+      show('screen-area-overview');
+      return true;
+    }
+
+    if (state.screen === 'screen-manage') {
+      show('screen-manage');
+      renderExerciseList();
+      return true;
+    }
+
+    if (state.screen === 'screen-shuffle') {
+      // Restore shuffle config values
+      if (state.shuffleConfig) {
+        $('shuffle-mode').value = state.shuffleConfig.mode;
+        $('shuffle-value').value = state.shuffleConfig.value;
+        $('shuffle-star-filter').value = state.shuffleConfig.starFilter;
+        $('shuffle-time-filter').value = state.shuffleConfig.timeFilter;
+        updateShuffleModeUI();
+      }
+      if (state.shuffleResultIds && !state.shuffleConfigVisible) {
+        // Restore results by matching IDs back to loaded exercises
+        lastResults = state.shuffleResultIds
+          .map(id => exercises.find(e => e.id === id))
+          .filter(Boolean);
+        $('shuffle-config').style.display = 'none';
+        $('shuffle-results').style.display = 'block';
+        renderResults(lastResults);
+      } else {
+        $('shuffle-config').style.display = 'block';
+        $('shuffle-results').style.display = 'none';
+      }
+      show('screen-shuffle');
+      return true;
+    }
+
+    if (state.screen === 'screen-random') {
+      randomQueue = [];
+      show('screen-random');
+      showNextRandom();
+      return true;
+    }
+
+    // Fallback: go to area overview
+    renderStats();
+    show('screen-area-overview');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // DOM helpers
 const $ = (id) => document.getElementById(id);
 const show = (screenId) => {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   $(screenId).classList.add('active');
+  if (!isRestoring) saveAppState(screenId);
 };
 
 // Auth
@@ -58,14 +164,22 @@ $('btn-login').addEventListener('click', async () => {
 });
 
 $('btn-logout').addEventListener('click', async () => {
+  if (currentUser) {
+    localStorage.removeItem(getStateKey());
+  }
   await signOut(auth);
 });
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   if (user) {
-    show('screen-areas');
-    loadAreas();
+    isRestoring = true;
+    const restored = await restoreAppState();
+    isRestoring = false;
+    if (!restored) {
+      show('screen-areas');
+      loadAreas();
+    }
   } else {
     show('screen-login');
   }
@@ -132,6 +246,8 @@ function renderStats() {
 }
 
 $('btn-back-to-areas').addEventListener('click', () => {
+  currentAreaId = null;
+  currentAreaName = '';
   show('screen-areas');
   loadAreas();
 });
@@ -164,6 +280,8 @@ $('btn-delete-area').addEventListener('click', () => {
     batch.delete(doc(db, 'users', currentUser.uid, 'areas', currentAreaId));
     await batch.commit();
     localStorage.removeItem(getExcludedKey());
+    currentAreaId = null;
+    currentAreaName = '';
     show('screen-areas');
     loadAreas();
   });
@@ -231,7 +349,7 @@ function renderExerciseList() {
     `;
     div.querySelector('.ex-info').addEventListener('click', (e) => {
       if (e.target.classList.contains('badge-excluded')) return;
-      openExerciseForm(ex);
+      openExerciseForm(ex, 'screen-manage');
     });
     const excludedBadge = div.querySelector('.badge-excluded');
     if (excludedBadge) {
@@ -278,9 +396,10 @@ $('btn-deactivate-all').addEventListener('click', async () => {
 });
 
 // --- EXERCISE FORM ---
-$('btn-add-exercise').addEventListener('click', () => openExerciseForm(null));
+$('btn-add-exercise').addEventListener('click', () => openExerciseForm(null, 'screen-manage'));
 
-function openExerciseForm(ex) {
+function openExerciseForm(ex, fromScreen) {
+  returnToScreen = fromScreen || 'screen-manage';
   editingExerciseId = ex ? ex.id : null;
   $('exercise-form-title').textContent = ex ? 'Edit Exercise' : 'New Exercise';
   $('btn-delete-exercise').style.display = ex ? 'block' : 'none';
@@ -308,10 +427,36 @@ document.querySelectorAll('#star-picker .star').forEach(s => {
   });
 });
 
+// Back from exercise form → return to previous screen
 $('btn-back-to-manage').addEventListener('click', () => {
-  show('screen-manage');
-  renderExerciseList();
+  navigateBackFromForm();
 });
+
+function navigateBackFromForm() {
+  if (returnToScreen === 'screen-manage') {
+    show('screen-manage');
+    renderExerciseList();
+  } else if (returnToScreen === 'screen-shuffle') {
+    // Update lastResults with potentially changed exercise data
+    if (lastResults) {
+      lastResults = lastResults.map(r => exercises.find(e => e.id === r.id)).filter(Boolean);
+      $('shuffle-config').style.display = 'none';
+      $('shuffle-results').style.display = 'block';
+      renderResults(lastResults);
+    }
+    show('screen-shuffle');
+  } else if (returnToScreen === 'screen-random') {
+    show('screen-random');
+    // Re-render the current random exercise with updated data
+    const ex = exercises.find(e => e.id === editingExerciseId);
+    if (ex) {
+      currentRandomExercise = ex;
+      renderRandomCard(ex);
+    }
+  } else {
+    show(returnToScreen);
+  }
+}
 
 $('exercise-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -335,25 +480,40 @@ $('exercise-form').addEventListener('submit', async (e) => {
     const docRef = await addDoc(ref, data);
     exercises.push({ id: docRef.id, ...data });
   }
-  show('screen-manage');
-  renderExerciseList();
+  navigateBackFromForm();
 });
 
 $('btn-delete-exercise').addEventListener('click', () => {
   showConfirm('Delete this exercise?', async () => {
-    const ref = doc(db, 'users', currentUser.uid, 'areas', currentAreaId, 'exercises', editingExerciseId);
+    const deletedId = editingExerciseId;
+    const ref = doc(db, 'users', currentUser.uid, 'areas', currentAreaId, 'exercises', deletedId);
     await deleteDoc(ref);
-    exercises = exercises.filter(x => x.id !== editingExerciseId);
-    excludedIds.delete(editingExerciseId);
+    exercises = exercises.filter(x => x.id !== deletedId);
+    excludedIds.delete(deletedId);
     saveExcluded();
-    show('screen-manage');
-    renderExerciseList();
+
+    // Remove from lastResults if present
+    if (lastResults) {
+      lastResults = lastResults.filter(r => r.id !== deletedId);
+    }
+
+    if (returnToScreen === 'screen-shuffle' && lastResults) {
+      $('shuffle-config').style.display = 'none';
+      $('shuffle-results').style.display = 'block';
+      renderResults(lastResults);
+      show('screen-shuffle');
+    } else if (returnToScreen === 'screen-random') {
+      show('screen-random');
+      showNextRandom();
+    } else {
+      show('screen-manage');
+      renderExerciseList();
+    }
   });
 });
 
 // --- SHUFFLE ---
 
-// Shuffle mode dropdown: update label and placeholder
 $('shuffle-mode').addEventListener('change', updateShuffleModeUI);
 
 function updateShuffleModeUI() {
@@ -375,7 +535,6 @@ function updateShuffleModeUI() {
   }
 }
 
-// Always show filter screen when entering shuffle (fix for bug #2)
 $('btn-shuffle-exercises').addEventListener('click', () => {
   lastResults = null;
   $('shuffle-config').style.display = 'block';
@@ -408,13 +567,9 @@ function getFilteredPool() {
   const starFilter = $('shuffle-star-filter').value;
   const timeFilter = $('shuffle-time-filter').value;
 
-  // Pinned: active + alwaysInclude + not excluded
   const pinned = exercises.filter(e => e.active !== false && e.alwaysInclude && !excludedIds.has(e.id));
-
-  // Regular pool: active + not pinned + not excluded
   let pool = exercises.filter(e => e.active !== false && !e.alwaysInclude && !excludedIds.has(e.id));
 
-  // Apply filters only to regular pool
   if (starFilter) {
     if (starFilter === 'gte1') pool = pool.filter(e => (e.stars || 0) >= 1);
     else if (starFilter === 'gte2') pool = pool.filter(e => (e.stars || 0) >= 2);
@@ -504,6 +659,8 @@ function doShuffle() {
   $('shuffle-config').style.display = 'none';
   $('shuffle-results').style.display = 'block';
   renderResults(results);
+  // Save state so shuffle results persist
+  saveAppState('screen-shuffle');
 }
 
 function randomPick(pool, n) {
@@ -511,7 +668,6 @@ function randomPick(pool, n) {
   return shuffled.slice(0, n);
 }
 
-// Greedily fill exercises until budget is reached
 function budgetFill(pool, budget, field) {
   if (budget <= 0 || pool.length === 0) return [];
   const shuffled = [...pool].sort(() => Math.random() - 0.5);
@@ -537,7 +693,7 @@ function renderResults(results) {
 
   results.forEach(ex => {
     const div = document.createElement('div');
-    div.className = 'result-card' + (isSingle ? ' single' : '');
+    div.className = 'result-card tappable' + (isSingle ? ' single' : '');
     const stars = ex.stars ? ' \u00b7 ' + '\u2605'.repeat(ex.stars) : '';
     const mins = ex.minutes ? ' \u00b7 ' + ex.minutes + ' min' : '';
     const note = ex.note ? `<div class="result-note">${ex.note}</div>` : '';
@@ -549,7 +705,13 @@ function renderResults(results) {
       ${note}
       <button class="btn-exclude">Exclude this</button>
     `;
-    div.querySelector('.btn-exclude').addEventListener('click', () => {
+    // Tap card (not exclude button) → edit exercise
+    div.addEventListener('click', (e) => {
+      if (e.target.classList.contains('btn-exclude')) return;
+      openExerciseForm(ex, 'screen-shuffle');
+    });
+    div.querySelector('.btn-exclude').addEventListener('click', (e) => {
+      e.stopPropagation();
       excludedIds.add(ex.id);
       saveExcluded();
       doShuffle();
@@ -588,17 +750,13 @@ function buildRandomQueue() {
   return [...shuffledPinned, ...shuffledRest];
 }
 
-function showNextRandom() {
-  if (randomQueue.length === 0) {
-    randomQueue = buildRandomQueue();
-  }
-
+function renderRandomCard(ex) {
   const card = $('random-card');
   const empty = $('random-empty');
   const wrapper = $('random-card-wrapper');
   const nextBtn = $('btn-next-random');
 
-  if (randomQueue.length === 0) {
+  if (!ex) {
     wrapper.style.display = 'none';
     empty.style.display = 'block';
     nextBtn.style.display = 'none';
@@ -609,7 +767,6 @@ function showNextRandom() {
   empty.style.display = 'none';
   nextBtn.style.display = 'block';
 
-  const ex = randomQueue.shift();
   const stars = ex.stars ? '\u2605'.repeat(ex.stars) : '';
   const mins = ex.minutes ? ex.minutes + ' min' : '';
   const meta = [stars, mins].filter(Boolean).join(' \u00b7 ');
@@ -622,6 +779,27 @@ function showNextRandom() {
     ${pinnedLabel}
     ${note}
   `;
+
+  // Make random card tappable → edit
+  card.onclick = () => {
+    openExerciseForm(ex, 'screen-random');
+  };
+}
+
+function showNextRandom() {
+  if (randomQueue.length === 0) {
+    randomQueue = buildRandomQueue();
+  }
+
+  if (randomQueue.length === 0) {
+    currentRandomExercise = null;
+    renderRandomCard(null);
+    return;
+  }
+
+  const ex = randomQueue.shift();
+  currentRandomExercise = ex;
+  renderRandomCard(ex);
 }
 
 // --- CONFIRM DIALOG ---
