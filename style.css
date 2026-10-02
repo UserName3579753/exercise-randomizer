@@ -1,4 +1,4 @@
-/* ExerShuffle v1.3 */
+/* ExerShuffle v2.0 */
 :root {
   --blue: #2979FF;
   --blue-dark: #1565C0;
@@ -389,7 +389,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .stats-card .stat {
-  margin: 8px 0;
+  margin: 4px 0;
   font-size: 0.95rem;
   color: var(--grey-dark);
 }
@@ -442,6 +442,7 @@ input:focus, textarea:focus, select:focus {
   color: var(--grey-dark);
   margin-top: 6px;
   font-style: italic;
+  white-space: pre-wrap;
 }
 
 .result-card .btn-exclude {
@@ -487,10 +488,7 @@ input:focus, textarea:focus, select:focus {
   max-width: 320px;
 }
 
-#screen-random .center-content {
-  padding-top: 40px;
-  justify-content: flex-start;
-}
+
 
 /* Dialog */
 .dialog-overlay {
@@ -556,4 +554,235 @@ input:focus, textarea:focus, select:focus {
 
 #random-card:active {
   background: var(--grey-light);
+}
+
+/* ===== v2.0 additions ===== */
+
+.center-content.full {
+  flex: 1;
+}
+
+/* Overview */
+.overview-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding-top: 8px;
+}
+
+.stats-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 12px;
+}
+
+/* Form */
+.toggle-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.toggle-text label {
+  margin-bottom: 0 !important;
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+.hint.center {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.last-done-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--white);
+  border: 1px solid var(--grey);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--grey-dark);
+  font-size: 0.95rem;
+}
+
+/* Last done text */
+.result-last-done {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin-top: 4px;
+}
+
+.result-last-done.today {
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.exercise-card .ex-last {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+/* Card action buttons */
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.result-card.single .card-actions {
+  justify-content: center;
+}
+
+.btn-done {
+  background: var(--blue);
+  color: var(--white);
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: 'Source Sans 3', sans-serif;
+  cursor: pointer;
+}
+
+.btn-done:active {
+  background: var(--blue-dark);
+}
+
+.btn-done.is-done {
+  background: #E3F2FD;
+  color: var(--blue);
+}
+
+.result-card .btn-exclude {
+  margin-top: 0;
+  font-family: 'Source Sans 3', sans-serif;
+  color: var(--text);
+}
+
+.result-card.done-today {
+  border-left: 4px solid var(--blue);
+}
+
+/* Shuffle results */
+.results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.shuffle-results .results-actions .btn-small {
+  margin: 0;
+}
+
+/* Summary bar (Essentials) */
+.summary-bar {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  text-align: center;
+  color: var(--grey-dark);
+  font-size: 0.95rem;
+}
+
+.summary-bar strong {
+  color: var(--text);
+}
+
+.summary-bar:empty {
+  display: none;
+}
+
+/* Random screen */
+.random-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding-top: 24px;
+}
+
+.random-buttons {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.random-buttons .btn-block {
+  max-width: 320px;
+}
+
+.btn-big {
+  padding: 16px 24px;
+  font-size: 1.15rem;
+}
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.btn-row .btn {
+  flex: 1;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  background: #424242;
+  color: var(--white);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  z-index: 2000;
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+#toast-msg {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toast-undo {
+  background: none;
+  border: none;
+  color: #90CAF9;
+  font-weight: 600;
+  font-size: 1rem;
+  font-family: 'Source Sans 3', sans-serif;
+  cursor: pointer;
+  padding: 4px 8px;
 }

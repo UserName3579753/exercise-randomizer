@@ -1,4 +1,4 @@
-<!-- ExerShuffle v1.2 -->
+<!-- ExerShuffle v2.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,7 +19,7 @@
 
   <!-- Login Screen -->
   <div class="screen active" id="screen-login">
-    <div class="center-content">
+    <div class="center-content full">
       <h1 class="app-title">ExerShuffle</h1>
       <p class="subtitle">Randomize your exercises</p>
       <button class="btn btn-primary" id="btn-login">Sign in with Google</button>
@@ -51,11 +51,14 @@
         <button class="btn-icon btn-danger-icon" id="btn-delete-area" title="Delete">&#x1F5D1;</button>
       </div>
     </header>
-    <div class="content center-content">
-      <div class="stats-card" id="area-stats"></div>
-      <button class="btn btn-primary btn-block" id="btn-manage-exercises">Manage Exercises</button>
-      <button class="btn btn-primary btn-block" id="btn-shuffle-exercises">Shuffle Exercises</button>
-      <button class="btn btn-primary btn-block" id="btn-random-exercise">Random Exercise</button>
+    <div class="content scrollable">
+      <div class="overview-stack">
+        <div class="stats-card" id="area-stats"></div>
+        <button class="btn btn-primary btn-block" id="btn-manage-exercises">Manage Exercises</button>
+        <button class="btn btn-primary btn-block" id="btn-essentials">&#x1F4CC; Essentials</button>
+        <button class="btn btn-primary btn-block" id="btn-shuffle-exercises">Shuffle Exercises</button>
+        <button class="btn btn-primary btn-block" id="btn-random-exercise">Random Exercise</button>
+      </div>
     </div>
   </div>
 
@@ -72,6 +75,7 @@
         <option value="name">Name</option>
         <option value="stars">Stars</option>
         <option value="status">Status</option>
+        <option value="lastdone">Last done</option>
       </select>
     </div>
     <div class="toolbar">
@@ -106,28 +110,60 @@
         </div>
         <div class="form-group">
           <label for="ex-minutes">Time (minutes)</label>
-          <input type="number" id="ex-minutes" min="0" max="999" step="1">
+          <input type="number" id="ex-minutes" min="0" max="999" step="1" inputmode="numeric">
         </div>
         <div class="form-group">
           <label for="ex-note">Note</label>
           <textarea id="ex-note" rows="3" maxlength="500"></textarea>
         </div>
         <div class="form-group toggle-group">
-          <label for="ex-active">Active</label>
+          <div class="toggle-text">
+            <label for="ex-active">Active</label>
+          </div>
           <label class="toggle">
             <input type="checkbox" id="ex-active" checked>
             <span class="toggle-slider"></span>
           </label>
         </div>
         <div class="form-group toggle-group">
-          <label for="ex-always-include">Always include in shuffle</label>
+          <div class="toggle-text">
+            <label for="ex-essential">&#x1F4CC; Essential</label>
+            <div class="hint">Listed under Essentials</div>
+          </div>
           <label class="toggle">
-            <input type="checkbox" id="ex-always-include">
+            <input type="checkbox" id="ex-essential">
             <span class="toggle-slider"></span>
           </label>
         </div>
+        <div class="form-group toggle-group">
+          <div class="toggle-text">
+            <label for="ex-excluded">&#x1F6AB; Excluded</label>
+            <div class="hint">Never shown in Shuffle, Random or Essentials</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="ex-excluded">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="form-group last-done-row" id="last-done-row">
+          <span id="form-last-done">Never done</span>
+          <button type="button" class="btn btn-small btn-secondary" id="btn-reset-last-done">Reset</button>
+        </div>
         <button type="submit" class="btn btn-primary btn-block">Save</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Essentials Screen -->
+  <div class="screen" id="screen-essentials">
+    <header class="header">
+      <button class="btn-back" id="btn-back-from-essentials">&larr;</button>
+      <h1>&#x1F4CC; Essentials</h1>
+    </header>
+    <div class="content scrollable">
+      <div id="essentials-summary" class="summary-bar"></div>
+      <div id="essentials-list"></div>
+      <div id="essentials-hidden" class="hint center"></div>
     </div>
   </div>
 
@@ -149,7 +185,7 @@
         </div>
         <div class="form-group">
           <label id="shuffle-value-label" for="shuffle-value">Number of exercises</label>
-          <input type="number" id="shuffle-value" min="1" max="9999" value="1">
+          <input type="number" id="shuffle-value" min="1" max="9999" value="1" inputmode="numeric">
         </div>
         <div class="form-group">
           <label for="shuffle-star-filter">Star filter</label>
@@ -176,9 +212,11 @@
         <button class="btn btn-primary btn-block" id="btn-shuffle">Shuffle!</button>
       </div>
       <div id="shuffle-results" class="shuffle-results" style="display:none;">
-        <button class="btn btn-secondary btn-small" id="btn-reshuffle">Shuffle Again</button>
-        <button class="btn btn-secondary btn-small" id="btn-new-shuffle">New Shuffle</button>
-        <button class="btn btn-secondary btn-small" id="btn-reset-excluded">Reset Excluded</button>
+        <div class="results-actions">
+          <button class="btn btn-secondary btn-small" id="btn-reshuffle">Shuffle Again</button>
+          <button class="btn btn-secondary btn-small" id="btn-new-shuffle">New Shuffle</button>
+          <button class="btn btn-secondary btn-small" id="btn-reset-excluded">Reset Excluded</button>
+        </div>
         <div id="shuffle-warning" class="warning" style="display:none;"></div>
         <div id="results-container"></div>
         <div id="results-total" class="results-total"></div>
@@ -192,12 +230,21 @@
       <button class="btn-back" id="btn-back-to-overview3">&larr;</button>
       <h1>Random Exercise</h1>
     </header>
-    <div class="content center-content">
-      <div id="random-card-wrapper">
-        <div class="result-card single" id="random-card"></div>
+    <div class="content scrollable">
+      <div class="random-stack">
+        <div id="random-card-wrapper">
+          <div class="result-card single tappable" id="random-card"></div>
+          <div id="random-progress" class="hint center"></div>
+        </div>
+        <div id="random-empty" class="empty-state" style="display:none;">No exercises available.<br>Check that some are active and not excluded.</div>
+        <div id="random-buttons" class="random-buttons">
+          <button class="btn btn-primary btn-block btn-big" id="btn-random-done">Done &#x2713;</button>
+          <div class="btn-row">
+            <button class="btn btn-secondary" id="btn-random-skip">Skip</button>
+            <button class="btn btn-secondary" id="btn-random-exclude">Exclude</button>
+          </div>
+        </div>
       </div>
-      <div id="random-empty" class="empty-state" style="display:none;">No exercises available.</div>
-      <button class="btn btn-primary btn-block" id="btn-next-random">Next</button>
     </div>
   </div>
 
@@ -222,6 +269,12 @@
         <button class="btn btn-primary" id="rename-confirm">Save</button>
       </div>
     </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast">
+    <span id="toast-msg"></span>
+    <button class="toast-undo" id="toast-undo">Undo</button>
   </div>
 
   <script type="module" src="app.js"></script>
